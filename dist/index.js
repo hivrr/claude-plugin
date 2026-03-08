@@ -159,8 +159,333 @@ Route as follows:
 The memory skill has full instructions for each operation.
 `;
 
-// src/skill/core/SKILL.md
+// src/command/plan.md
+var plan_default = `---
+description: Triage a feature or problem into sized GitHub and Linear issues
+---
+
+Load the \`plan\` skill and execute the full triage workflow for the input provided.
+`;
+
+// src/command/brainstorm.md
+var brainstorm_default = `---
+description: Collaborative thinking session to work through a technical problem or idea
+---
+
+Load the \`brainstorm\` skill and run an open-ended thinking session on the topic provided.
+`;
+
+// src/skill/plan/SKILL.md
 var SKILL_default = `---
+name: plan
+description: Triage a feature or problem into sized, actionable GitHub and Linear issues
+license: MIT
+compatibility: opencode
+---
+
+# Plan
+
+Transform a feature request, problem description, or rough idea into a concrete set of sized, actionable issues ready for implementation. Creates issues in GitHub and Linear (if configured), informed by the project's existing memory and architecture.
+
+Keep moving through phases. Only stop at the marked checkpoint.
+
+---
+
+## Phase 1 \u2014 Load Core Philosophy and Memory
+
+Load the \`core\` skill to internalize quality standards and git safety rules.
+
+Load memory: if \`.ai/memory/MANIFEST.md\` exists, read it. Pick entries relevant to the planning context \u2014 prior architectural decisions, established patterns, known constraints. Read those files. Hold this as \`loaded_memory\`. This context shapes what you propose and what you rule out.
+
+---
+
+## Phase 2 \u2014 Parse the Input
+
+The input can be:
+- A freeform description: "add email verification to signup"
+- A problem statement: "users keep losing their session after 5 minutes"
+- A reference to an existing GitHub issue: \`#123\`
+- A vague concept: "improve the onboarding flow"
+- No input \u2014 open triage session
+
+Extract:
+- \`topic\` \u2014 what this is about in plain terms
+- \`source\` \u2014 freeform, issue ref, or empty
+- \`scope_hint\` \u2014 any explicit size or priority signal in the input
+
+If the input is an existing issue reference, fetch it: \`gh issue view {number} --json title,body,labels\`.
+
+---
+
+## Phase 3 \u2014 Research the Codebase
+
+Before proposing anything, understand what already exists.
+
+- Read the relevant areas of the codebase related to the topic
+- Check for existing open issues that overlap: \`gh issue list --state open --limit 50 --json number,title,labels\`
+- Look for existing patterns, conventions, and constraints in \`loaded_memory\`
+
+You are not planning yet \u2014 you are building enough understanding to plan well.
+
+---
+
+## Phase 4 \u2014 Clarify
+
+Ask the user 2\u20133 focused questions to resolve genuine ambiguity before proposing a breakdown. Do not ask for information you can infer from the codebase or memory. Do not ask more than 3 questions.
+
+Good questions resolve: scope boundaries, priority ordering, acceptance criteria that aren't obvious, constraints you can't see in the code.
+
+Wait for answers before continuing.
+
+---
+
+## Phase 5 \u2014 Draft the Breakdown
+
+Propose a set of issues. For each issue:
+- **Title**: concise, action-oriented ("Add email verification token generation")
+- **Body**: why this is needed, what done looks like, acceptance criteria
+- **Size**: XS (< 1 hour) / S (half day) / M (1 day) / L (2-3 days) / XL (needs splitting)
+- **Labels**: bug / feature / refactor / docs / test / chore
+- **Dependencies**: which issues must be completed first
+
+Rules:
+- No issue larger than L \u2014 split XL issues
+- Prefer fewer, clearer issues over many small ones
+- Each issue should be implementable independently where possible
+
+---
+
+## Phase 6 \u2014 Checkpoint: User Approval
+
+**Stop here.** Present the proposed breakdown to the user:
+
+\`\`\`
+PLAN DRAFT
+\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+Topic: {topic}
+
+Issues:
+  1. [{size}] {title}
+     {one-line summary}
+     depends on: none
+
+  2. [{size}] {title}
+     {one-line summary}
+     depends on: #1
+  ...
+
+Ready to create {n} issues in GitHub{linear_note}.
+Approve, adjust, or cancel?
+\`\`\`
+
+Do not proceed until the user explicitly approves or provides changes. If they provide changes, revise the draft and show it again. Do not create any issues until approved.
+
+---
+
+## Phase 7 \u2014 Create GitHub Issues
+
+For each approved issue, create it with \`gh issue create\`:
+
+\`\`\`bash
+gh issue create \\
+  --title "{title}" \\
+  --body "{body with acceptance criteria}" \\
+  --label "{labels}"
+\`\`\`
+
+Collect the created issue numbers and URLs.
+
+Display each as it's created: \`Created: #{number} \u2014 {title}\`
+
+---
+
+## Phase 8 \u2014 Create Linear Issues (if configured)
+
+Check for Linear configuration by looking for \`LINEAR_API_KEY\` in the environment or a \`.linear.yaml\` file in the project root.
+
+If Linear is not configured, skip this phase silently.
+
+If configured, read \`.linear.yaml\` for team ID and project defaults:
+
+\`\`\`yaml
+teamId: ENG
+projectId: proj_abc123
+defaultLabels: [feature]
+\`\`\`
+
+For each issue, create a matching Linear issue using the \`linear\` CLI or API:
+
+\`\`\`bash
+linear issue create \\
+  --title "{title}" \\
+  --description "{body}" \\
+  --team "{teamId}" \\
+  --estimate {size_points}
+\`\`\`
+
+Size \u2192 story points: XS=1, S=2, M=3, L=5
+
+Link the GitHub issue number in the Linear issue description.
+
+Display each: \`Linear: {identifier} \u2014 {title}\`
+
+---
+
+## Phase 9 \u2014 Save Memory and Done
+
+Write a context entry to \`.ai/memory/context/\` capturing the plan rationale:
+
+\`\`\`markdown
+---
+ref: Context:plan-{topic-slug}
+title: Plan \u2014 {topic}
+date: {today}
+issues: {github_issue_numbers}
+---
+
+## What was planned
+{brief description of what was broken down and why}
+
+## Key decisions
+{any non-obvious choices made during triage}
+
+## Issue breakdown
+{list of created issue numbers and titles}
+\`\`\`
+
+Update \`MANIFEST.md\`. Commit: \`git add .ai/memory/ && git commit -m "chore: record plan for {topic}"\`.
+
+Display:
+
+\`\`\`
+PLAN COMPLETE
+\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+GitHub: {issue_numbers}
+Linear: {linear_ids or 'not configured'}
+
+Start with: /work-issue {first_issue_number}
+\`\`\`
+`;
+
+// src/skill/brainstorm/SKILL.md
+var SKILL_default2 = `---
+name: brainstorm
+description: Collaborative thinking session to work through a technical problem or idea
+license: MIT
+compatibility: opencode
+---
+
+# Brainstorm
+
+A thinking session \u2014 not an implementation session. The goal is to reach clarity on a problem, explore alternatives, and challenge assumptions before committing to an approach. Nothing is built here. At the end, the user decides whether to write a summary, move to \`/plan\`, or simply stop.
+
+Keep the conversation moving. Ask pointed questions. Do not drift into implementation detail unless the user pulls you there. Depth over breadth \u2014 explore one thread fully before branching.
+
+---
+
+## Phase 1 \u2014 Load Core Philosophy and Memory
+
+Load the \`core\` skill for quality standards and architectural principles.
+
+Load memory: if \`.ai/memory/MANIFEST.md\` exists, read it. Scan for entries relevant to the topic \u2014 prior decisions that constrain the solution space, patterns that should be followed or challenged, known context about the system. Read the relevant files. This is your starting knowledge before the conversation begins.
+
+---
+
+## Phase 2 \u2014 Parse the Topic
+
+The input can be:
+- A specific technical problem: "our auth middleware is leaking sessions"
+- An open question: "should we split this service?"
+- A vague feeling: "something feels wrong with how we handle errors"
+- No input \u2014 open thinking session, ask what they want to work through
+
+Extract:
+- \`topic\` \u2014 what the user wants to think through
+- \`framing\` \u2014 is this a problem to solve, a decision to make, or an idea to explore?
+
+---
+
+## Phase 3 \u2014 Research Before Responding
+
+Before saying anything, look at what's actually there.
+
+Read the relevant code, open issues, and recent commits related to the topic. Check \`loaded_memory\` for prior decisions or patterns that touch this area. You want to understand the current state well enough to ask good questions \u2014 not to jump to answers.
+
+This phase is silent. Do not show your research process unless asked.
+
+---
+
+## Phase 4 \u2014 Open the Conversation
+
+Present what you understand about the topic in 2\u20134 sentences, then ask the single most important question that would unlock the most clarity.
+
+Do not present multiple questions at once. Do not present solutions yet. Do not validate the user's framing without examining it first \u2014 if the framing seems off, say so.
+
+Good first questions:
+- "What's making this feel wrong right now \u2014 a specific symptom or a general sense?"
+- "Has this approach worked elsewhere in the codebase, or is this the first time?"
+- "What would a good outcome look like in concrete terms?"
+- "What have you already ruled out and why?"
+
+---
+
+## Phase 5 \u2014 Iterate
+
+Keep the conversation going until the user has reached clarity or run out of useful threads to pull.
+
+Each response should:
+- Reflect back what you just heard to confirm understanding
+- Introduce one new angle, constraint, or alternative worth considering
+- End with a question or a concrete observation that moves the thinking forward
+
+Challenge assumptions when you spot them: "You said X \u2014 what if the opposite were true?" Surface tradeoffs that the user might not have considered. Reference \`loaded_memory\` when a past decision is directly relevant.
+
+Do not agree with everything. If a proposed direction contradicts an established pattern or a prior decision, say so directly and explain why.
+
+Stay in thinking mode. If the user starts heading toward implementation details, redirect: "We can get into that \u2014 but first, are we confident this is the right approach?"
+
+---
+
+## Phase 6 \u2014 Offer Next Steps
+
+When the conversation has run its natural course, or when the user signals they're ready to move on, offer:
+
+1. **Write a summary** \u2014 capture the key insights, decisions, and open questions to \`.ai/memory/context/\`
+2. **Create issues** \u2014 hand off to \`/plan\` to break this into actionable GitHub/Linear issues
+3. **Done** \u2014 stop here, no artifacts
+
+If they choose to write a summary, write a context entry to \`.ai/memory/\`:
+
+\`\`\`markdown
+---
+ref: Context:brainstorm-{topic-slug}
+title: Brainstorm \u2014 {topic}
+date: {today}
+---
+
+## Problem / Question
+{what was being explored}
+
+## Key insights
+{the most important things that emerged}
+
+## Alternatives considered
+{what was explored and why it was kept or ruled out}
+
+## Open questions
+{what remains unresolved}
+
+## Recommended next step
+{what to do next, if anything}
+\`\`\`
+
+Update \`MANIFEST.md\`. Commit: \`git add .ai/memory/ && git commit -m "chore: capture brainstorm on {topic}"\`.
+
+If they choose to create issues, run \`/plan\` with the topic as input \u2014 the summary becomes the input context.
+`;
+
+// src/skill/core/SKILL.md
+var SKILL_default3 = `---
 name: core
 description: Hivrr core coding philosophy - quality gates, git safety, and task completion standards
 license: MIT
@@ -212,7 +537,7 @@ Ask rather than assume on architectural decisions.
 `;
 
 // src/skill/work-issue/SKILL.md
-var SKILL_default2 = `---
+var SKILL_default4 = `---
 name: work-issue
 description: Full workflow for implementing a GitHub or Linear issue end-to-end
 license: MIT
@@ -460,7 +785,7 @@ If any phase fails:
 `;
 
 // src/skill/work-pr/SKILL.md
-var SKILL_default3 = `---
+var SKILL_default5 = `---
 name: work-pr
 description: Address PR feedback end-to-end \u2014 fetch, implement fixes, test, push
 license: MIT
@@ -698,7 +1023,7 @@ Return control to the user.
 `;
 
 // src/skill/merge-pr/SKILL.md
-var SKILL_default4 = `---
+var SKILL_default6 = `---
 name: merge-pr
 description: Merge a GitHub PR, close linked issues, clean up branches, capture follow-up work
 license: MIT
@@ -904,7 +1229,7 @@ Return control to the user.
 `;
 
 // src/skill/audit/SKILL.md
-var SKILL_default5 = `---
+var SKILL_default7 = `---
 name: audit
 description: Run code audits across domains \u2014 security, accessibility, tech-debt, performance
 license: MIT
@@ -1088,7 +1413,7 @@ Suggest: "Use \`/work-issue {first_issue_number}\` to start fixing."
 `;
 
 // src/skill/audit-security/SKILL.md
-var SKILL_default6 = `---
+var SKILL_default8 = `---
 name: audit-security
 description: Scan codebase for security vulnerabilities using OWASP Top 10
 license: MIT
@@ -1188,10 +1513,10 @@ If a file can't be read, skip it and note it in the summary. Don't stop the scan
 `;
 
 // src/skill/audit-accessibility/SKILL.md
-var SKILL_default7 = '---\nname: audit-accessibility\ndescription: Scan codebase for accessibility issues using WCAG 2.1 AA\nlicense: MIT\ncompatibility: opencode\n---\n\n# Accessibility Audit\n\nScan frontend code for accessibility violations against WCAG 2.1 AA standards.\n\n---\n\n## What to Scan\n\n**Quick mode** \u2014 prioritize these files:\n1. Form components\n2. Button and interactive element components\n3. Navigation and layout components\n4. Modal and dialog components\n\n**Deep mode** \u2014 scan all frontend files: `.jsx`, `.tsx`, `.html`, `.vue`, `.svelte`, `.component.ts`, `.component.html`, and `.css`/`.scss` for color analysis.\n\nIf no file index was provided, use Glob to discover frontend files. If the project has no frontend files, say so and stop.\n\n---\n\n## What to Look For\n\n### Text Alternatives (WCAG 1.1.1)\n- `<img>` elements without an `alt` attribute\n- Informative images with empty `alt=""` (correct for decorative images only)\n- `<button>` elements containing only an icon with no `aria-label`\n- `<svg>` elements without a `title`, `aria-label`, or `aria-labelledby`\n\n### Structure and Relationships (WCAG 1.3.1)\n- `<input>` elements with no associated `<label>` or `aria-label`\n- Data tables missing `<th>` elements\n- Radio or checkbox groups without `<fieldset>` and `<legend>`\n- `<div>` or `<span>` used where semantic elements should be (headings, lists, tables)\n- Pages missing landmark regions (`<main>`, `<nav>`, `<header>`, `<footer>`)\n\n### Use of Color (WCAG 1.4.1)\n- Error or success states indicated only by color with no other visual cue\n- Links distinguished from surrounding text only by color (no underline or other indicator)\n- Required fields marked only with a color change\n\n### Color Contrast (WCAG 1.4.3)\n- Hardcoded color values that appear to fail 4.5:1 for normal text or 3:1 for large text\n- Very light placeholder text colors\n- Note: static analysis can only flag potential issues \u2014 computed styles need runtime verification\n\n### Keyboard Accessibility (WCAG 2.1.1)\n- `<div>` or `<span>` elements with `onClick` but no keyboard event handler (`onKeyDown`, `onKeyPress`)\n- Custom interactive elements without `tabindex`\n- `tabindex` values greater than 0 (disrupts natural tab order)\n- `onMouseOver` / `onMouseEnter` handlers with no keyboard equivalent\n\n### Focus Visibility (WCAG 2.4.7)\n- `outline: none` or `outline: 0` applied without a replacement focus style\n- Custom interactive elements with no `:focus` CSS rule\n- Focus rings that blend into the background\n\n### Headings and Labels (WCAG 2.4.6)\n- Skipped heading levels (e.g. `<h1>` followed directly by `<h3>`)\n- More than one `<h1>` per page or view\n- Empty heading elements\n- Generic, non-descriptive labels like "Click here" or "Submit"\n\n### Skip Navigation (WCAG 2.4.1)\n- Navigation-heavy pages with no skip-to-content link\n\n### Error Identification (WCAG 3.3.1)\n- Form validation errors not announced to screen readers\n- Invalid inputs without `aria-invalid="true"`\n- Error messages not linked to their input via `aria-describedby`\n\n### ARIA Usage \u2014 deep mode\n- Native elements with redundant ARIA roles (e.g., `<button role="button">`)\n- `aria-hidden="true"` applied to elements that receive keyboard focus\n- Custom widgets missing required ARIA roles or state attributes (`aria-expanded`, `aria-selected`, etc.)\n\n---\n\n## Severity Guide\n\n| Severity | When to use |\n|----------|-------------|\n| critical | Complete barrier \u2014 user cannot complete the task (e.g., form with no labels) |\n| high | Major barrier that\'s difficult to work around (missing alt text, no keyboard access) |\n| medium | Moderate impact, workarounds exist (missing skip link, potential contrast issue) |\n| low | Minor impact, best practice improvement |\n\n| Effort | When to use |\n|--------|-------------|\n| trivial | Add a single attribute |\n| small | Localized fix, under an hour |\n| medium | Multiple components, needs testing with assistive technology |\n| large | Pattern change across the codebase |\n\n---\n\n## Output Format\n\nReport findings as a list. For each finding include:\n- **File and line number**\n- **Title** \u2014 a short, specific description of the issue\n- **Severity** and **effort**\n- **What\'s wrong** \u2014 what the code is doing and why it fails accessibility\n- **How to fix** \u2014 a concrete code-level recommendation\n- **WCAG criterion** (e.g., WCAG 1.1.1)\n\nGroup by severity (critical first). At the end, report files scanned and issues found.\n\nIf no frontend files exist, say so \u2014 this audit doesn\'t apply. If a file can\'t be read, skip and note it.\n';
+var SKILL_default9 = '---\nname: audit-accessibility\ndescription: Scan codebase for accessibility issues using WCAG 2.1 AA\nlicense: MIT\ncompatibility: opencode\n---\n\n# Accessibility Audit\n\nScan frontend code for accessibility violations against WCAG 2.1 AA standards.\n\n---\n\n## What to Scan\n\n**Quick mode** \u2014 prioritize these files:\n1. Form components\n2. Button and interactive element components\n3. Navigation and layout components\n4. Modal and dialog components\n\n**Deep mode** \u2014 scan all frontend files: `.jsx`, `.tsx`, `.html`, `.vue`, `.svelte`, `.component.ts`, `.component.html`, and `.css`/`.scss` for color analysis.\n\nIf no file index was provided, use Glob to discover frontend files. If the project has no frontend files, say so and stop.\n\n---\n\n## What to Look For\n\n### Text Alternatives (WCAG 1.1.1)\n- `<img>` elements without an `alt` attribute\n- Informative images with empty `alt=""` (correct for decorative images only)\n- `<button>` elements containing only an icon with no `aria-label`\n- `<svg>` elements without a `title`, `aria-label`, or `aria-labelledby`\n\n### Structure and Relationships (WCAG 1.3.1)\n- `<input>` elements with no associated `<label>` or `aria-label`\n- Data tables missing `<th>` elements\n- Radio or checkbox groups without `<fieldset>` and `<legend>`\n- `<div>` or `<span>` used where semantic elements should be (headings, lists, tables)\n- Pages missing landmark regions (`<main>`, `<nav>`, `<header>`, `<footer>`)\n\n### Use of Color (WCAG 1.4.1)\n- Error or success states indicated only by color with no other visual cue\n- Links distinguished from surrounding text only by color (no underline or other indicator)\n- Required fields marked only with a color change\n\n### Color Contrast (WCAG 1.4.3)\n- Hardcoded color values that appear to fail 4.5:1 for normal text or 3:1 for large text\n- Very light placeholder text colors\n- Note: static analysis can only flag potential issues \u2014 computed styles need runtime verification\n\n### Keyboard Accessibility (WCAG 2.1.1)\n- `<div>` or `<span>` elements with `onClick` but no keyboard event handler (`onKeyDown`, `onKeyPress`)\n- Custom interactive elements without `tabindex`\n- `tabindex` values greater than 0 (disrupts natural tab order)\n- `onMouseOver` / `onMouseEnter` handlers with no keyboard equivalent\n\n### Focus Visibility (WCAG 2.4.7)\n- `outline: none` or `outline: 0` applied without a replacement focus style\n- Custom interactive elements with no `:focus` CSS rule\n- Focus rings that blend into the background\n\n### Headings and Labels (WCAG 2.4.6)\n- Skipped heading levels (e.g. `<h1>` followed directly by `<h3>`)\n- More than one `<h1>` per page or view\n- Empty heading elements\n- Generic, non-descriptive labels like "Click here" or "Submit"\n\n### Skip Navigation (WCAG 2.4.1)\n- Navigation-heavy pages with no skip-to-content link\n\n### Error Identification (WCAG 3.3.1)\n- Form validation errors not announced to screen readers\n- Invalid inputs without `aria-invalid="true"`\n- Error messages not linked to their input via `aria-describedby`\n\n### ARIA Usage \u2014 deep mode\n- Native elements with redundant ARIA roles (e.g., `<button role="button">`)\n- `aria-hidden="true"` applied to elements that receive keyboard focus\n- Custom widgets missing required ARIA roles or state attributes (`aria-expanded`, `aria-selected`, etc.)\n\n---\n\n## Severity Guide\n\n| Severity | When to use |\n|----------|-------------|\n| critical | Complete barrier \u2014 user cannot complete the task (e.g., form with no labels) |\n| high | Major barrier that\'s difficult to work around (missing alt text, no keyboard access) |\n| medium | Moderate impact, workarounds exist (missing skip link, potential contrast issue) |\n| low | Minor impact, best practice improvement |\n\n| Effort | When to use |\n|--------|-------------|\n| trivial | Add a single attribute |\n| small | Localized fix, under an hour |\n| medium | Multiple components, needs testing with assistive technology |\n| large | Pattern change across the codebase |\n\n---\n\n## Output Format\n\nReport findings as a list. For each finding include:\n- **File and line number**\n- **Title** \u2014 a short, specific description of the issue\n- **Severity** and **effort**\n- **What\'s wrong** \u2014 what the code is doing and why it fails accessibility\n- **How to fix** \u2014 a concrete code-level recommendation\n- **WCAG criterion** (e.g., WCAG 1.1.1)\n\nGroup by severity (critical first). At the end, report files scanned and issues found.\n\nIf no frontend files exist, say so \u2014 this audit doesn\'t apply. If a file can\'t be read, skip and note it.\n';
 
 // src/skill/audit-tech-debt/SKILL.md
-var SKILL_default8 = `---
+var SKILL_default10 = `---
 name: audit-tech-debt
 description: Scan codebase for maintainability issues and code quality problems
 license: MIT
@@ -1294,7 +1619,7 @@ If no issues are found, say so. If a file can't be read, skip and note it in the
 `;
 
 // src/skill/audit-performance/SKILL.md
-var SKILL_default9 = `---
+var SKILL_default11 = `---
 name: audit-performance
 description: Scan codebase for performance bottlenecks and optimization opportunities
 license: MIT
@@ -1392,7 +1717,7 @@ If no performance issues are found, say so. If a file can't be read, skip and no
 `;
 
 // src/skill/debug/SKILL.md
-var SKILL_default10 = `---
+var SKILL_default12 = `---
 name: debug
 description: Diagnose a bug, failure, or problem \u2014 produces a diagnostic report with root cause analysis and recommendations
 license: MIT
@@ -1574,7 +1899,7 @@ If they choose to create an issue: use the problem description as the title, the
 `;
 
 // src/skill/wave/SKILL.md
-var SKILL_default11 = `---
+var SKILL_default13 = `---
 name: wave
 description: Execute multiple related issues in order on a single shared branch
 license: MIT
@@ -1700,7 +2025,7 @@ The work-issue skill handles all of that once, for the entire group together.
 `;
 
 // src/skill/memory/SKILL.md
-var SKILL_default12 = `---
+var SKILL_default14 = `---
 name: memory
 description: Project memory \u2014 decisions, patterns, and context stored in .ai/memory/
 license: MIT
@@ -1967,18 +2292,22 @@ async function install(client) {
     { dir: path.join(CONFIG_DIR, "commands"), name: "audit.md", content: audit_default },
     { dir: path.join(CONFIG_DIR, "commands"), name: "debug.md", content: debug_default },
     { dir: path.join(CONFIG_DIR, "commands"), name: "memory.md", content: memory_default },
-    { dir: path.join(CONFIG_DIR, "skills", "core"), name: "SKILL.md", content: SKILL_default },
-    { dir: path.join(CONFIG_DIR, "skills", "work-issue"), name: "SKILL.md", content: SKILL_default2 },
-    { dir: path.join(CONFIG_DIR, "skills", "work-pr"), name: "SKILL.md", content: SKILL_default3 },
-    { dir: path.join(CONFIG_DIR, "skills", "merge-pr"), name: "SKILL.md", content: SKILL_default4 },
-    { dir: path.join(CONFIG_DIR, "skills", "audit"), name: "SKILL.md", content: SKILL_default5 },
-    { dir: path.join(CONFIG_DIR, "skills", "audit-security"), name: "SKILL.md", content: SKILL_default6 },
-    { dir: path.join(CONFIG_DIR, "skills", "audit-accessibility"), name: "SKILL.md", content: SKILL_default7 },
-    { dir: path.join(CONFIG_DIR, "skills", "audit-tech-debt"), name: "SKILL.md", content: SKILL_default8 },
-    { dir: path.join(CONFIG_DIR, "skills", "audit-performance"), name: "SKILL.md", content: SKILL_default9 },
-    { dir: path.join(CONFIG_DIR, "skills", "debug"), name: "SKILL.md", content: SKILL_default10 },
-    { dir: path.join(CONFIG_DIR, "skills", "wave"), name: "SKILL.md", content: SKILL_default11 },
-    { dir: path.join(CONFIG_DIR, "skills", "memory"), name: "SKILL.md", content: SKILL_default12 }
+    { dir: path.join(CONFIG_DIR, "commands"), name: "plan.md", content: plan_default },
+    { dir: path.join(CONFIG_DIR, "commands"), name: "brainstorm.md", content: brainstorm_default },
+    { dir: path.join(CONFIG_DIR, "skills", "core"), name: "SKILL.md", content: SKILL_default3 },
+    { dir: path.join(CONFIG_DIR, "skills", "work-issue"), name: "SKILL.md", content: SKILL_default4 },
+    { dir: path.join(CONFIG_DIR, "skills", "work-pr"), name: "SKILL.md", content: SKILL_default5 },
+    { dir: path.join(CONFIG_DIR, "skills", "merge-pr"), name: "SKILL.md", content: SKILL_default6 },
+    { dir: path.join(CONFIG_DIR, "skills", "audit"), name: "SKILL.md", content: SKILL_default7 },
+    { dir: path.join(CONFIG_DIR, "skills", "audit-security"), name: "SKILL.md", content: SKILL_default8 },
+    { dir: path.join(CONFIG_DIR, "skills", "audit-accessibility"), name: "SKILL.md", content: SKILL_default9 },
+    { dir: path.join(CONFIG_DIR, "skills", "audit-tech-debt"), name: "SKILL.md", content: SKILL_default10 },
+    { dir: path.join(CONFIG_DIR, "skills", "audit-performance"), name: "SKILL.md", content: SKILL_default11 },
+    { dir: path.join(CONFIG_DIR, "skills", "debug"), name: "SKILL.md", content: SKILL_default12 },
+    { dir: path.join(CONFIG_DIR, "skills", "wave"), name: "SKILL.md", content: SKILL_default13 },
+    { dir: path.join(CONFIG_DIR, "skills", "memory"), name: "SKILL.md", content: SKILL_default14 },
+    { dir: path.join(CONFIG_DIR, "skills", "plan"), name: "SKILL.md", content: SKILL_default },
+    { dir: path.join(CONFIG_DIR, "skills", "brainstorm"), name: "SKILL.md", content: SKILL_default2 }
   ];
   for (const { dir, name, content } of targets) {
     await fs.mkdir(dir, { recursive: true });
@@ -2015,14 +2344,25 @@ async function readSessionFiles(worktree) {
     return [];
   }
 }
-var HivrrPlugin = async ({ client, worktree }) => {
+async function resolveProjectRoot(worktree, $, directory) {
+  if (worktree)
+    return worktree;
+  try {
+    const result = await $`git rev-parse --show-toplevel`.cwd(directory).quiet().text();
+    return result.trim();
+  } catch {
+    return null;
+  }
+}
+var HivrrPlugin = async ({ client, worktree, $, directory }) => {
   await install(client);
   return {
     "experimental.session.compacting": async (_input, output) => {
-      if (!worktree)
+      const root = await resolveProjectRoot(worktree, $, directory);
+      if (!root)
         return;
-      const manifest = await readManifest(worktree);
-      const sessions = await readSessionFiles(worktree);
+      const manifest = await readManifest(root);
+      const sessions = await readSessionFiles(root);
       if (manifest) {
         output.context.push(`## Project Memory
 

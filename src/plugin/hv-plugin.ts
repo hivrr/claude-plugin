@@ -9,6 +9,10 @@ import mergePrCommandContent from "../command/merge-pr.md" with { type: "text" }
 import auditCommandContent from "../command/audit.md" with { type: "text" }
 import debugCommandContent from "../command/debug.md" with { type: "text" }
 import memoryCommandContent from "../command/memory.md" with { type: "text" }
+import planCommandContent from "../command/plan.md" with { type: "text" }
+import brainstormCommandContent from "../command/brainstorm.md" with { type: "text" }
+import planSkillContent from "../skill/plan/SKILL.md" with { type: "text" }
+import brainstormSkillContent from "../skill/brainstorm/SKILL.md" with { type: "text" }
 import coreSkillContent from "../skill/core/SKILL.md" with { type: "text" }
 import workIssueSkillContent from "../skill/work-issue/SKILL.md" with { type: "text" }
 import workPrSkillContent from "../skill/work-pr/SKILL.md" with { type: "text" }
@@ -51,6 +55,8 @@ async function install(client: Parameters<Plugin>[0]["client"]): Promise<void> {
     { dir: path.join(CONFIG_DIR, "commands"), name: "audit.md", content: auditCommandContent },
     { dir: path.join(CONFIG_DIR, "commands"), name: "debug.md", content: debugCommandContent },
     { dir: path.join(CONFIG_DIR, "commands"), name: "memory.md", content: memoryCommandContent },
+    { dir: path.join(CONFIG_DIR, "commands"), name: "plan.md", content: planCommandContent },
+    { dir: path.join(CONFIG_DIR, "commands"), name: "brainstorm.md", content: brainstormCommandContent },
     // Skills
     { dir: path.join(CONFIG_DIR, "skills", "core"), name: "SKILL.md", content: coreSkillContent },
     { dir: path.join(CONFIG_DIR, "skills", "work-issue"), name: "SKILL.md", content: workIssueSkillContent },
@@ -64,6 +70,8 @@ async function install(client: Parameters<Plugin>[0]["client"]): Promise<void> {
     { dir: path.join(CONFIG_DIR, "skills", "debug"), name: "SKILL.md", content: debugSkillContent },
     { dir: path.join(CONFIG_DIR, "skills", "wave"), name: "SKILL.md", content: waveSkillContent },
     { dir: path.join(CONFIG_DIR, "skills", "memory"), name: "SKILL.md", content: memorySkillContent },
+    { dir: path.join(CONFIG_DIR, "skills", "plan"), name: "SKILL.md", content: planSkillContent },
+    { dir: path.join(CONFIG_DIR, "skills", "brainstorm"), name: "SKILL.md", content: brainstormSkillContent },
   ]
 
   for (const { dir, name, content } of targets) {
@@ -113,7 +121,29 @@ async function readSessionFiles(worktree: string): Promise<Array<{ name: string;
   }
 }
 
-export const HivrrPlugin: Plugin = async ({ client, worktree }) => {
+/**
+ * Resolve the project root (git repository root) reliably.
+ *
+ * Prefers the `worktree` value provided by opencode. If that is absent or
+ * points to a path that cannot be verified, falls back to asking git directly
+ * via the Bun shell. This handles cases where opencode has not yet resolved
+ * the worktree, or where nested/monorepo git layouts cause a mismatch.
+ */
+async function resolveProjectRoot(
+  worktree: string | undefined,
+  $: any,
+  directory: string
+): Promise<string | null> {
+  if (worktree) return worktree
+  try {
+    const result: string = await $`git rev-parse --show-toplevel`.cwd(directory).quiet().text()
+    return result.trim()
+  } catch {
+    return null
+  }
+}
+
+export const HivrrPlugin: Plugin = async ({ client, worktree, $, directory }) => {
   await install(client)
 
   return {
@@ -125,10 +155,11 @@ export const HivrrPlugin: Plugin = async ({ client, worktree }) => {
      * knows to preserve phase state, plan progress, and implementation context.
      */
     "experimental.session.compacting": async (_input: unknown, output: any) => {
-      if (!worktree) return
+      const root = await resolveProjectRoot(worktree, $, directory)
+      if (!root) return
 
-      const manifest = await readManifest(worktree)
-      const sessions = await readSessionFiles(worktree)
+      const manifest = await readManifest(root)
+      const sessions = await readSessionFiles(root)
 
       // Inject memory MANIFEST so it survives the compaction
       if (manifest) {
