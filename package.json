@@ -18,7 +18,8 @@
     "build": "bun build src/index.ts --outdir dist --target bun --format esm && tsc --emitDeclarationOnly",
     "clean": "rm -rf dist",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "bun run clean && bun run build"
+    "prepublishOnly": "bun run clean && bun run build",
+    "publish:private": "npm publish --registry=https://npm.pkg.github.com/"
   },
   "keywords": [
     "opencode",
@@ -27,6 +28,9 @@
   ],
   "author": "hivrr",
   "license": "MIT",
+  "publishConfig": {
+    "access": "restricted"
+  },
   "dependencies": {
     "@opencode-ai/plugin": "1.0.223"
   },
