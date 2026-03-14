@@ -13,11 +13,9 @@ Before starting: read this entire skill, then create a focused todo list, then e
 
 ---
 
-## Phase 1 — Load Core Philosophy and Memory
+## Phase 1 — Load Core Philosophy
 
 Load the `core` skill to internalize project values. These principles guide how you assess severity and prioritize findings.
-
-Load memory: if `.ai/memory/MANIFEST.md` exists, read it. Pick any entries relevant to the domain(s) being audited — prior decisions about security posture, known architectural patterns, past audit findings. Read those files. Hold this as `loaded_memory`. If no MANIFEST exists, skip silently.
 
 ---
 
@@ -158,9 +156,7 @@ After each successful creation, note the issue number so you can display the ful
 
 ---
 
-## Phase 9 — Save Memory and Done
-
-Save memory: if the audit revealed patterns about the codebase worth preserving (recurring issues, architectural context, security posture), write a context entry to `.ai/memory/` using the memory skill conventions and update `MANIFEST.md`. Then commit those files: `git add .ai/memory/ && git commit -m "chore: record audit findings in memory"`. If nothing significant emerged, skip.
+## Phase 9 — Done
 
 Display:
 ```
