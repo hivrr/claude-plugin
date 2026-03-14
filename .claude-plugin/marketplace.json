@@ -22,7 +22,6 @@
         "./skill/brainstorm",
         "./skill/core",
         "./skill/debug",
-
         "./skill/merge-pr",
         "./skill/plan",
         "./skill/wave",

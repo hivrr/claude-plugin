@@ -184,7 +184,7 @@ Wait for their response before continuing.
 
 ## Phase 11 — Commit
 
-Stage all changes: `git add -A`.
+Stage all changes: `git add -A`
 
 Write a conventional commit message:
 - Format: `{type}({scope}): {description}`
