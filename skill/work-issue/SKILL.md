@@ -231,3 +231,100 @@ If any phase fails:
 - Display what went wrong clearly
 - Don't silently swallow errors
 - Don't retry indefinitely — 3 attempts max on any single fix
+
+---
+
+## When to Ask a Human
+
+The bar for posting a question is high. Most ambiguity should be resolved by reading more code or following existing patterns. Only post a question when you hit a genuine blocker that cannot be resolved autonomously.
+
+### When to Ask
+
+Post a question **only** when:
+- Acceptance criteria directly contradict each other
+- A required credential or external resource is missing and cannot be inferred
+- A security-sensitive architectural decision has significant tradeoffs where neither option is clearly better
+- The spec explicitly says "confirm with team before proceeding"
+
+### When to Decide Autonomously
+
+**Never ask** for:
+- Code style choices — follow existing conventions
+- Missing tests — write them
+- Ambiguous variable names — pick the clearest option
+- Whether to add a comment — use judgment
+- Anything resolvable by reading more code or exploring the codebase
+
+### Question Protocol
+
+When a genuine blocker is reached during any phase:
+
+1. **Write the question file** to `.ai/session/work-issue-{N}-question.json`:
+
+```json
+{
+  "issue_number": 123,
+  "question": "concise question text",
+  "context": "relevant code snippet or spec excerpt",
+  "options": ["A: description", "B: description"],
+  "posted_at": "2026-03-14T10:30:00Z"
+}
+```
+
+Fields:
+- `issue_number` (required) — the issue being worked on
+- `question` (required) — a concise, specific question
+- `context` (required) — the relevant code snippet or spec excerpt that created the ambiguity
+- `options` (optional) — concrete choices when the blocker has identifiable alternatives
+- `posted_at` (required) — ISO 8601 timestamp
+
+2. **Log the blocker:**
+
+```
+BLOCKED: [question text]. Posted question, waiting for human answer.
+```
+
+3. **Exit the current phase cleanly:**
+   - Leave the branch intact
+   - Do not commit partial work
+   - Do not clean up the working directory
+   - Return control to the caller
+
+The worker process detects the question file and transitions the job to `paused_waiting_for_input`.
+
+### Resume Protocol
+
+When execution resumes after a human provides an answer (injected via `answer.json` alongside the question file):
+
+1. Read `.ai/session/work-issue-{N}-question.json` and `.ai/session/work-issue-{N}-answer.json`
+2. Log: `Resuming with answer: [answer text]`
+3. Delete both the question and answer files
+4. Continue from the blocked phase with the answer as context
+
+### Examples
+
+**Good question — contradictory acceptance criteria:**
+```json
+{
+  "issue_number": 42,
+  "question": "AC #2 says 'return 404 for missing users' but AC #5 says 'always return 200 with an empty body'. Which behavior is correct?",
+  "context": "AC #2: Return 404 when user not found\nAC #5: All endpoints return 200 with empty body on no results",
+  "options": ["A: 404 for missing users (REST convention)", "B: 200 with empty body (matches existing search endpoints)"],
+  "posted_at": "2026-03-14T10:30:00Z"
+}
+```
+
+**Good question — missing credential:**
+```json
+{
+  "issue_number": 87,
+  "question": "The deploy step requires an AWS_ROLE_ARN for cross-account access. No value is configured in .env.example or CI secrets. What ARN should be used?",
+  "context": "deploy.sh line 14: aws sts assume-role --role-arn $AWS_ROLE_ARN",
+  "posted_at": "2026-03-14T11:00:00Z"
+}
+```
+
+**Not a question — decide autonomously:**
+- "Should I use camelCase or snake_case?" → Follow existing convention.
+- "Should I add unit tests for this helper?" → Yes, write them.
+- "The issue doesn't mention error handling — should I add it?" → Yes, handle errors explicitly.
