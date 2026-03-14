@@ -13,6 +13,16 @@ Before starting: read this entire skill, then create a focused todo list, then e
 
 ---
 
+## Phase 0 — Check for Pending Resume
+
+Before doing anything else, check if this is a resume from a previously blocked question:
+
+1. Scan for `.ai/session/work-issue-*-answer.json`
+2. If an answer file exists, jump directly to the **Resume Protocol** section below
+3. If no answer file exists, continue to Phase 1
+
+---
+
 ## Phase 1 — Load Core Philosophy
 
 Load the `core` skill to internalize project values: quality gates, git safety, and task completion standards. These principles govern every decision you make throughout this workflow.
@@ -134,7 +144,7 @@ Write the code directly. Follow these principles:
 - Follow existing patterns in the codebase — explore before writing
 - Make the smallest change that satisfies the requirements
 - Handle errors explicitly — don't let things fail silently
-- If you're unsure about an architectural decision, ask rather than assume
+- If you're unsure about an architectural decision, follow the **When to Ask a Human** criteria below to decide whether to ask or resolve it autonomously
 - Write or update tests alongside the code, not after
 
 For sequential multi-issue, process each issue fully through Phase 12 (Create PR) before starting the next one.
@@ -259,7 +269,7 @@ Post a question **only** when:
 
 When a genuine blocker is reached during any phase:
 
-1. **Write the question file** to `.ai/session/work-issue-{N}-question.json`:
+1. **Write the question file** to `.ai/session/work-issue-{N}-question.json` (where `N` is the issue number being worked on; for a unified wave covering multiple issues, use the first issue number in the group):
 
 ```json
 {
@@ -276,7 +286,7 @@ Fields:
 - `question` (required) — a concise, specific question
 - `context` (required) — the relevant code snippet or spec excerpt that created the ambiguity
 - `options` (optional) — concrete choices when the blocker has identifiable alternatives
-- `posted_at` (required) — ISO 8601 timestamp
+- `posted_at` (required) — ISO 8601 timestamp; generate with `date -u +%Y-%m-%dT%H:%M:%SZ`
 
 2. **Log the blocker:**
 
