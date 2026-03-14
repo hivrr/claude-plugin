@@ -2,7 +2,7 @@ name: Claude Code Review
 
 on:
   pull_request:
-    types: [opened, synchronize, ready_for_review, reopened]
+    types: [opened, synchronize]
     # Optional: Only run on specific file changes
     # paths:
     #   - "src/**/*.ts"
@@ -18,13 +18,14 @@ jobs:
     #   github.event.pull_request.user.login == 'new-developer' ||
     #   github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR'
 
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pull-requests: read
+      pull-requests: write
       issues: read
       id-token: write
-
+    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -32,13 +33,40 @@ jobs:
           fetch-depth: 1
 
       - name: Run Claude Code Review
+        timeout-minutes: 8
         id: claude-review
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
-          plugins: 'code-review@claude-code-plugins'
-          prompt: '/code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }}'
-          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
-          # or https://code.claude.com/docs/en/cli-reference for available options
+          prompt: |
+            # Claude Code Review
 
+            Context: ${{ github.event.action == 'opened' && 'New PR — first review.' || 'PR was updated after a prior review — focus on verifying previous feedback was addressed rather than raising new non-BLOCKER findings.' }}
+
+            Review the PR for security vulnerabilities, correctness, test coverage, and code quality.
+            Use `gh pr diff ${{ github.event.pull_request.number }}` for the changes and read CLAUDE.md for repository conventions.
+            If you need review history, use `gh pr view ${{ github.event.pull_request.number }} --json comments`.
+
+            Structure findings by severity:
+
+            ### 🔴 BLOCKER (must fix before merge)
+            Security vulnerabilities, resource leaks, data loss risks, broken functionality, test failures.
+
+            ### 🟡 REQUIRED (should fix now)
+            Code quality issues, missing error handling, unclear logic, incomplete implementations.
+
+            ### 🟢 DEFERRED (nice to have)
+            Refactoring suggestions, additional tests, documentation improvements.
+
+            For every finding include: file:line reference, what the issue is, why it matters, and a concrete fix.
+
+            If this is a follow-up review, start with:
+            - ✅ Fixed: [items addressed]
+            - ⏳ Remaining: [items still open]
+            - 🆕 New: [only BLOCKER-level new findings]
+
+            Post your review with `gh pr comment ${{ github.event.pull_request.number }} --body "YOUR_REVIEW"`.
+          
+          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
+          # or https://docs.anthropic.com/en/docs/claude-code/sdk#command-line for available options
+          claude_args: '--allowed-tools "Bash(gh issue view:*),Bash(gh search:*),Bash(gh issue list:*),Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh pr list:*)"'
