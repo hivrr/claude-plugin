@@ -13,11 +13,9 @@ Keep moving through phases. Only stop at the marked checkpoint.
 
 ---
 
-## Phase 1 — Load Core Philosophy and Memory
+## Phase 1 — Load Core Philosophy
 
 Load the `core` skill to internalize quality standards and git safety rules.
-
-Load memory: if `.ai/memory/MANIFEST.md` exists, read it. Pick entries relevant to the planning context — prior architectural decisions, established patterns, known constraints. Read those files. Hold this as `loaded_memory`. This context shapes what you propose and what you rule out.
 
 ---
 
@@ -45,7 +43,7 @@ Before proposing anything, understand what already exists.
 
 - Read the relevant areas of the codebase related to the topic
 - Check for existing open issues that overlap: `gh issue list --state open --limit 50 --json number,title,labels`
-- Look for existing patterns, conventions, and constraints in `loaded_memory`
+- Look for existing patterns and conventions in the codebase
 
 You are not planning yet — you are building enough understanding to plan well.
 
@@ -153,29 +151,7 @@ Display each: `Linear: {identifier} — {title}`
 
 ---
 
-## Phase 9 — Save Memory and Done
-
-Write a context entry to `.ai/memory/context/` capturing the plan rationale:
-
-```markdown
----
-ref: Context:plan-{topic-slug}
-title: Plan — {topic}
-date: {today}
-issues: {github_issue_numbers}
----
-
-## What was planned
-{brief description of what was broken down and why}
-
-## Key decisions
-{any non-obvious choices made during triage}
-
-## Issue breakdown
-{list of created issue numbers and titles}
-```
-
-Update `MANIFEST.md`. Commit: `git add .ai/memory/ && git commit -m "chore: record plan for {topic}"`.
+## Phase 9 — Done
 
 Display:
 

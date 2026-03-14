@@ -13,11 +13,9 @@ Keep the conversation moving. Ask pointed questions. Do not drift into implement
 
 ---
 
-## Phase 1 — Load Core Philosophy and Memory
+## Phase 1 — Load Core Philosophy
 
 Load the `core` skill for quality standards and architectural principles.
-
-Load memory: if `.ai/memory/MANIFEST.md` exists, read it. Scan for entries relevant to the topic — prior decisions that constrain the solution space, patterns that should be followed or challenged, known context about the system. Read the relevant files. This is your starting knowledge before the conversation begins.
 
 ---
 
@@ -39,7 +37,7 @@ Extract:
 
 Before saying anything, look at what's actually there.
 
-Read the relevant code, open issues, and recent commits related to the topic. Check `loaded_memory` for prior decisions or patterns that touch this area. You want to understand the current state well enough to ask good questions — not to jump to answers.
+Read the relevant code, open issues, and recent commits related to the topic. You want to understand the current state well enough to ask good questions — not to jump to answers.
 
 This phase is silent. Do not show your research process unless asked.
 
@@ -68,7 +66,7 @@ Each response should:
 - Introduce one new angle, constraint, or alternative worth considering
 - End with a question or a concrete observation that moves the thinking forward
 
-Challenge assumptions when you spot them: "You said X — what if the opposite were true?" Surface tradeoffs that the user might not have considered. Reference `loaded_memory` when a past decision is directly relevant.
+Challenge assumptions when you spot them: "You said X — what if the opposite were true?" Surface tradeoffs that the user might not have considered.
 
 Do not agree with everything. If a proposed direction contradicts an established pattern or a prior decision, say so directly and explain why.
 
@@ -80,35 +78,7 @@ Stay in thinking mode. If the user starts heading toward implementation details,
 
 When the conversation has run its natural course, or when the user signals they're ready to move on, offer:
 
-1. **Write a summary** — capture the key insights, decisions, and open questions to `.ai/memory/context/`
-2. **Create issues** — hand off to `/plan` to break this into actionable GitHub/Linear issues
-3. **Done** — stop here, no artifacts
+1. **Create issues** — hand off to `/plan` to break this into actionable GitHub/Linear issues
+2. **Done** — stop here, no artifacts
 
-If they choose to write a summary, write a context entry to `.ai/memory/`:
-
-```markdown
----
-ref: Context:brainstorm-{topic-slug}
-title: Brainstorm — {topic}
-date: {today}
----
-
-## Problem / Question
-{what was being explored}
-
-## Key insights
-{the most important things that emerged}
-
-## Alternatives considered
-{what was explored and why it was kept or ruled out}
-
-## Open questions
-{what remains unresolved}
-
-## Recommended next step
-{what to do next, if anything}
-```
-
-Update `MANIFEST.md`. Commit: `git add .ai/memory/ && git commit -m "chore: capture brainstorm on {topic}"`.
-
-If they choose to create issues, run `/plan` with the topic as input — the summary becomes the input context.
+If they choose to create issues, run `/plan` with the topic as input.
