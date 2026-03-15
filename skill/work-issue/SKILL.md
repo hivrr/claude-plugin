@@ -19,7 +19,8 @@ Before doing anything else, check if this is a resume from a previously blocked 
 
 1. Scan for `.ai/session/work-issue-*-answer.json`
 2. If an answer file exists, jump directly to the **Resume Protocol** section below
-3. If no answer file exists, continue to Phase 1
+3. If no answer file exists, check for `.ai/session/work-issue-*-question.json`. If a question file exists, apply the **Stale Question Recovery** protocol.
+4. If neither file exists, continue to Phase 1
 
 ---
 
@@ -322,7 +323,7 @@ WARNING: Stale question for issue #{N} — posted {age} ago with no answer.
 
 2. **Resolve autonomously** — If the question can now be answered by re-reading the codebase or if the issue has been updated with clarifying information:
    - Log: `Resolving stale question autonomously: [resolution rationale]`
-   - Append the original question and the autonomous resolution to `.ai/session/work-issue-log.md` with a timestamp
+   - **Persist before cleanup:** Append the original question and the autonomous resolution to `.ai/session/work-issue-log.md` with a timestamp.
    - Delete the question file
    - Continue from the blocked phase with the resolution as context
 
@@ -331,7 +332,7 @@ WARNING: Stale question for issue #{N} — posted {age} ago with no answer.
    - Log: `Re-posted stale question for issue #{N}.`
    - Exit cleanly as in the original Question Protocol
 
-When `--auto` is set, prefer option 2 (resolve autonomously) if possible, otherwise fall back to option 1 (abort). When `--auto` is not set, present the options to the user and let them choose.
+When `--auto` is set, prefer option 2 (resolve autonomously) if possible, otherwise use option 1 (abort). Option 3 (re-post) is not available in `--auto` mode. When `--auto` is not set, present all three options to the user and let them choose.
 
 ### Resume Protocol
 
